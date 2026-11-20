@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Outreach Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a working queue first (what to do today), then the pipeline by job with warm paths, then insights, import and profile. */
+:root{
+  --bg:#f4f5f2; --surface:#ffffff; --ink:#1b211e; --muted:#5d6762; --line:#dde1dc;
+  --accent:#1f6f5c; --accent-ink:#ffffff; --accent-soft:#e2efe9;
+  --warn:#9a5b00; --warn-soft:#fbefd9; --good:#2a6b2f; --good-soft:#e3f1e2; --bad:#a3352b; --bad-soft:#f8e3e0;
+  --info:#3b5b8c; --info-soft:#e4eaf4; --warm:#a24d1c; --warm-soft:#f9e6da;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --radius:10px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121614; --surface:#1a201d; --ink:#e7ece9; --muted:#9aa59f; --line:#2c3531;
+    --accent:#5fbf9f; --accent-ink:#0d1a15; --accent-soft:#1d332b;
+    --warn:#f0b75a; --warn-soft:#3a2d16; --good:#8fd18f; --good-soft:#1e3220; --bad:#f08c80; --bad-soft:#3c201c;
+    --info:#9ab7e6; --info-soft:#1d2738; --warm:#f2a06c; --warm-soft:#3a2418;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121614; --surface:#1a201d; --ink:#e7ece9; --muted:#9aa59f; --line:#2c3531;
+  --accent:#5fbf9f; --accent-ink:#0d1a15; --accent-soft:#1d332b;
+  --warn:#f0b75a; --warn-soft:#3a2d16; --good:#8fd18f; --good-soft:#1e3220; --bad:#f08c80; --bad-soft:#3c201c;
+  --info:#9ab7e6; --info-soft:#1d2738; --warm:#f2a06c; --warm-soft:#3a2418;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body)}
+a{color:var(--accent)}
+.wrap{max-width:1040px;margin:0 auto;padding:20px 20px 60px}
+header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+h1{font:700 26px/1.15 var(--display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font:600 19px/1.25 var(--display);margin:0 0 10px;text-wrap:balance}
+h3{font:600 15px/1.3 var(--body);margin:0}
+h4{font:600 13px/1.3 var(--body);margin:0 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.sub{color:var(--muted);font-size:13.5px;margin:2px 0 0}
+.status{font:12.5px var(--mono);color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--good)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
+nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+nav.tabs a{padding:9px 14px;text-decoration:none;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;white-space:nowrap}
+nav.tabs a[aria-current="page"]{color:var(--ink);border-color:var(--accent)}
+nav.tabs .count{font:11px var(--mono);background:var(--accent);color:var(--accent-ink);border-radius:9px;padding:1px 6px;margin-left:6px}
+.banner{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:var(--info-soft);color:var(--ink);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:14px}
+.banner.warn{background:var(--warn-soft)}
+.banner.warm{background:var(--warm-soft)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.stat b{display:block;font:600 26px/1.1 var(--display);font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:13px}
+.stat.hot{border-color:var(--accent);box-shadow:inset 4px 0 0 var(--accent)}
+.stat.due{box-shadow:inset 4px 0 0 var(--warn)}
+.stat.warmth{box-shadow:inset 4px 0 0 var(--warm)}
+section.block{margin-bottom:26px}
+.block-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.block-head p{margin:0;color:var(--muted);font-size:13.5px}
+.cards{display:grid;gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:grid;gap:10px}
+.card.warmcard{box-shadow:inset 4px 0 0 var(--warm)}
+.card-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:flex-start}
+.who{display:grid;gap:2px}
+.who .meta{color:var(--muted);font-size:13.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{font:12px/1 var(--body);padding:5px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.chip.warmchip{background:var(--warm-soft);color:var(--warm);border-color:transparent;font-weight:600}
+.pill{font:600 11.5px/1 var(--body);padding:5px 8px;border-radius:999px;white-space:nowrap;letter-spacing:.01em}
+.st-to_connect{background:var(--info-soft);color:var(--info)}
+.st-requested{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.st-accepted{background:var(--accent-soft);color:var(--accent)}
+.st-messaged{background:var(--warn-soft);color:var(--warn)}
+.st-followed_up{background:var(--warn-soft);color:var(--warn)}
+.st-replied{background:var(--good-soft);color:var(--good)}
+.st-closed{background:var(--bg);color:var(--muted)}
+textarea,input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+textarea{resize:vertical;min-height:84px;line-height:1.45}
+textarea.msg{min-height:120px;background:var(--surface)}
+textarea.msg.short{min-height:76px}
+textarea.posting{min-height:110px;font-size:13.5px}
+input:focus,textarea:focus,select:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.msg-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;font-size:12.5px;color:var(--muted)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.over{color:var(--bad);font-weight:600}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,.btn{font:500 13.5px/1 var(--body);padding:9px 13px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+button:hover,.btn:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.primary:hover{filter:brightness(1.07)}
+button.warmbtn{background:var(--warm-soft);border-color:transparent;color:var(--warm);font-weight:600}
+button.ghost{border-color:transparent;background:transparent;color:var(--muted);padding:6px 8px}
+button.ghost:hover{color:var(--ink)}
+button.small{padding:6px 10px;font-size:12.5px}
+button.danger{color:var(--bad)}
+button:disabled{opacity:.55;cursor:default}
+.compact{display:grid;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+.row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;padding:10px 14px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row .who{min-width:200px;flex:1}
+.empty{color:var(--muted);font-size:14px;padding:14px 16px;background:var(--surface);border:1px dashed var(--line);border-radius:var(--radius);margin:0}
+form.grid,.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-items:end}
+label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+label.check{display:flex;align-items:center;gap:8px;color:var(--ink);font-weight:400}
+label.check input{width:auto}
+.full{grid-column:1/-1}
+.job{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
+.job-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.job-head .meta{color:var(--muted);font-size:13.5px}
+.job-sec{padding:12px 16px;border-top:1px solid var(--line)}
+.job-sec:first-of-type{border-top:0}
+.job-sec.tint{background:var(--bg)}
+.job-sec.warmsec{background:var(--warm-soft)}
+.job-sec.warmsec .row{border-color:color-mix(in srgb, var(--warm) 18%, transparent)}
+.job .row select{width:auto;padding:6px 8px;font-size:13px}
+details summary{cursor:pointer;color:var(--accent);font-weight:500;font-size:14px}
+details[open] summary{margin-bottom:10px}
+.drop{border:2px dashed var(--line);border-radius:var(--radius);padding:28px 16px;text-align:center;background:var(--surface);color:var(--muted)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+ol.steps{margin:0 0 14px;padding-left:20px;display:grid;gap:4px}
+.note{font-size:13px;color:var(--muted);margin:6px 0 0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
+.toast.show{opacity:1}
+.tip{border-left:3px solid var(--accent);padding:2px 0 2px 12px;color:var(--muted);font-size:13.5px;margin:0 0 14px}
+.reqs{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.reqs li{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;font-size:13.5px;padding:8px 10px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.reqs li .ev{color:var(--muted)}
+.reqs li .ev.gap{color:var(--warn)}
+@media (max-width:560px){.reqs li{grid-template-columns:1fr}}
+.thread{display:grid;gap:6px}
+.bubble{max-width:85%;padding:8px 11px;border-radius:10px;font-size:13.5px;white-space:pre-wrap;line-height:1.45}
+.bubble.me{justify-self:end;background:var(--accent-soft)}
+.bubble.them{justify-self:start;background:var(--bg);border:1px solid var(--line)}
+.bubble small{display:block;color:var(--muted);font-size:11.5px;margin-bottom:2px}
+.sitbar{display:flex;flex-wrap:wrap;gap:6px}
+.advice{font-size:13.5px;background:var(--info-soft);border-radius:8px;padding:8px 11px}
+.bars{display:grid;gap:10px}
+.bar-row{display:grid;grid-template-columns:minmax(120px,190px) 1fr minmax(92px,auto);gap:12px;align-items:center;font-size:13.5px}
+.bar-track{height:12px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.bar-fill{height:100%;background:var(--accent);border-radius:6px 0 0 6px}
+.bar-fill.warmfill{background:var(--warm)}
+.bar-val{font:12.5px var(--mono);color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.insights{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.insights li{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 12px;font-size:14px}
+.insights li.pending{border-left-color:var(--line);color:var(--muted)}
+.funnel{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:22px}
+.funnel .stat small{display:block;font:12px var(--mono);color:var(--muted);margin-top:2px}
+@media (prefers-reduced-motion: reduce){.toast{transition:none}}
+@media (max-width:520px){.wrap{padding:16px 16px 50px} .stat b{font-size:22px} .bar-row{grid-template-columns:1fr; gap:4px} .bar-val{text-align:left}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Job Outreach Tracker</h1>
+      <p class="sub">Reach recruiters, hiring managers and people you already know, with messages written for each job.</p>
+    </div>
+    <div class="status" id="status" aria-live="polite"><span class="dot"></span><span>Loading…</span></div>
+  </header>
+  <nav class="tabs" id="tabs">
+    <a href="#today" data-view="today">Today</a>
+    <a href="#jobs" data-view="jobs">Jobs &amp; contacts</a>
+    <a href="#insights" data-view="insights">What's working</a>
+    <a href="#import" data-view="import">Import connections</a>
+    <a href="#profile" data-view="profile">My profile</a>
+  </nav>
+  <main id="main"><p class="empty">Loading your tracker…</p></main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- utilities ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const pad = n => String(n).padStart(2, "0");
+const isoOf = d => d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+const todayISO = () => isoOf(new Date());
+const isoOffset = days => { const d = new Date(); d.setDate(d.getDate() + days); return isoOf(d); };
+function daysSince(iso){
+  if(!iso) return null;
+  const [y,m,d] = iso.split("-").map(Number);
+  const then = new Date(y, m-1, d), now = new Date(); now.setHours(0,0,0,0);
+  return Math.round((now - then) / 86400000);
+}
+function fmtDate(iso){
+  if(!iso) return "";
+  const [y,m,d] = iso.split("-").map(Number);
+  return new Date(y, m-1, d).toLocaleDateString(undefined, {month:"short", day:"numeric"});
+}
+function ago(iso){
+  const n = daysSince(iso);
+  if(n == null) return "";
+  if(n <= 0) return "today";
+  if(n === 1) return "yesterday";
+  return n + " days ago";
+}
+const firstName = n => (String(n || "").trim().split(/\s+/)[0] || "there");
+const stripDot = s => String(s || "").trim().replace(/[.\s]+$/, "");
+const nameKey = n => String(n || "").toLowerCase().replace(/\s+/g, " ").trim();
+let toastTimer;
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600); }
+function liSearch(q){ return "https://www.linkedin.com/search/results/people/?keywords=" + encodeURIComponent(q.trim()); }
+function normCompany(s){
+  return String(s || "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\b(inc|llc|ltd|limited|corp|corporation|co|company|gmbh|plc|sa|ag|pvt|private|group|holdings)\b/g, " ")
+    .replace(/\s+/g, " ").trim();
+}
+function sameCompany(a, b){
+  const x = normCompany(a), y = normCompany(b);
+  if(!x || !y) return false;
+  if(x === y) return true;
+  const [s, l] = x.length < y.length ? [x, y] : [y, x];
+  return s.length >= 4 && (l.startsWith(s + " ") || l.endsWith(" " + s));
+}
+
+const STAGES = { to_connect:"To connect", requested:"Request sent", accepted:"Connected", messaged:"Messaged", followed_up:"Nudged", replied:"Replied", closed:"Closed" };
+const TYPES = { recruiter:"Recruiter", manager:"Hiring manager", referral:"Someone you know", other:"Other" };
+const OUTCOMES = { interview:"Got an interview", referral:"Got a referral", no:"Didn't go anywhere" };
+
+/* ---------- state ---------- */
+function blankState(){
+  return {
+    v: 2,
+    profile: { name:"", title:"", years:"", targets:"", skills:"", highlight:"", resume:"", email:"" },
+    settings: { nudgeAfter: 7, dailyGoal: 10 },
+    jobs: [], contacts: [], exampleNet: [],
+    meta: { lastImportAt:"", lastConnectedMax:"", netCount:0 }
+  };
+}
+function mkContact(o){
+  return Object.assign({ id: uid(), jobId:"", name:"", title:"", company:"", type:"recruiter", url:"", stage:"to_connect",
+    requestedOn:"", acceptedOn:"", messagedOn:"", nudgedOn:"", repliedOn:"", outcome:"", msgs:{}, src:{}, sentMeta:null,
+    thread:[], theirDraft:"", myDraft:"", coach:null, notes:"" }, o);
+}
+function exampleData(s){
+  const j = { id: uid(), company:"Northwind Analytics", role:"Data Analyst", link:"", applied:true, appliedOn: isoOffset(-9), example:true,
+    posting:"Data Analyst, Northwind Analytics. You'll own weekly revenue reporting, build Tableau dashboards for the sales team, and write SQL against our Snowflake warehouse. 2+ years of SQL required; Python a plus. Experience with A/B test analysis preferred.",
+    fitLine:"", analysis:null };
+  const j2 = { id: uid(), company:"Contoso Health", role:"BI Analyst", link:"", applied:true, appliedOn: isoOffset(-40), example:true, posting:"", fitLine:"", analysis:null };
+  s.jobs.push(j, j2);
+  s.contacts.push(
+    mkContact({ jobId:j.id, name:"Priya Raman", title:"Technical Recruiter", company:j.company, type:"recruiter", stage:"accepted", requestedOn:isoOffset(-4), acceptedOn:isoOffset(-1), example:true }),
+    mkContact({ jobId:j.id, name:"Dana Ortiz", title:"Talent Partner", company:j.company, type:"recruiter", stage:"messaged", requestedOn:isoOffset(-14), acceptedOn:isoOffset(-11), messagedOn:isoOffset(-8), example:true,
+      thread:[{ from:"me", kind:"follow", on:isoOffset(-8), text:"Thanks for connecting, Dana! I applied for the Data Analyst role at Northwind Analytics. Would you be the right person to talk to about it?" }] }),
+    mkContact({ jobId:j.id, name:"Marcus Lee", title:"Analytics Manager", company:j.company, type:"manager", stage:"to_connect", example:true }),
+    mkContact({ jobId:j.id, name:"Sam Whitfield", title:"Director of Data", company:j.company, type:"manager", stage:"requested", requestedOn:isoOffset(-3), example:true }),
+    mkContact({ jobId:j.id, name:"Owen Hart", title:"Recruiting Coordinator", company:j.company, type:"recruiter", stage:"replied", requestedOn:isoOffset(-12), acceptedOn:isoOffset(-10), messagedOn:isoOffset(-9), repliedOn:isoOffset(-1), example:true,
+      sentMeta:{ hasNumber:true, src:"template", fit:false, len:300 },
+      thread:[
+        { from:"me", kind:"follow", on:isoOffset(-9), text:"Thanks for connecting, Owen! I applied for the Data Analyst role at Northwind Analytics. Quick background: I cut weekly reporting time by 40% using SQL and Python. Would you be the right person to talk to about this role?" },
+        { from:"them", on:isoOffset(-1), text:"Hi! Thanks for reaching out. Could you send me your resume? I'll pass it to the hiring manager." }
+      ] })
+  );
+  // Past outreach so "What's working" has something to show (clearly marked as examples)
+  const past = [
+    ["Alicia Gomez","Recruiter","recruiter",true,"template",true,true],["Ben Carter","Talent Acquisition","recruiter",false,"template",false,false],
+    ["Chloe Park","Recruiter","recruiter",true,"ai",true,true],["Diego Ruiz","Sourcer","recruiter",false,"edited",false,false],
+    ["Erin Walsh","Recruiter","recruiter",false,"template",false,true],["Femi Adeyemi","BI Manager","manager",true,"ai",true,true],
+    ["Grace Liu","Head of Analytics","manager",false,"template",false,false],["Hiro Tanaka","Data Manager","manager",true,"edited",true,false],
+    ["Isla Brown","Analytics Lead","manager",false,"template",false,false],["Jon Meyer","Analyst (former classmate)","referral",true,"edited",true,true],
+    ["Kara Singh","Data Engineer","referral",true,"template",false,true],["Liam O'Neil","BI Developer","referral",false,"template",false,false]
+  ];
+  past.forEach((p, i) => {
+    const sent = isoOffset(-60 + i * 2);
+    s.contacts.push(mkContact({ jobId:j2.id, name:p[0], title:p[1], company:j2.company, type:p[2], stage:"closed",
+      requestedOn: p[2] === "referral" ? "" : isoOffset(-66 + i * 2), acceptedOn: isoOffset(-63 + i * 2), messagedOn: sent,
+      repliedOn: p[6] ? isoOffset(-57 + i * 2) : "", outcome: p[6] ? (p[2] === "referral" ? "referral" : (i % 3 === 0 ? "interview" : "no")) : "no",
+      sentMeta:{ hasNumber:p[3], src:p[4], fit:p[5], len:320 }, example:true }));
+  });
+  // Three requests that were never accepted, for the acceptance rate
+  ["Mia Torres","Noah Kim","Olivia Grant"].forEach((n, i) => s.contacts.push(mkContact({ jobId:j2.id, name:n, title: i ? "Recruiter" : "Analytics Manager", company:j2.company, type: i ? "recruiter" : "manager", stage:"closed", requestedOn:isoOffset(-50 + i), outcome:"no", example:true })));
+  s.exampleNet = [
+    { name:"Leah Kim", url:"", slug:"", company:"Northwind Analytics", title:"Software Engineer", on:isoOffset(-400) },
+    { name:"Rafael Souza", url:"", slug:"", company:"Northwind Analytics Inc.", title:"Product Designer", on:isoOffset(-200) },
+    { name:"Tess Moreau", url:"", slug:"", company:"Contoso Health", title:"Data Scientist", on:isoOffset(-90) }
+  ];
+}
+let state = blankState();
+let network = [];           // imported connections (not examples)
+let loaded = false;
+let importResult = null;    // transient
+const jobById = id => state.jobs.find(j => j.id === id);
+const contactById = id => state.contacts.find(c => c.id === id);
+const hasExamples = () => state.jobs.some(j => j.example) || state.contacts.some(c => c.example) || state.exampleNet.length > 0;
+const allNetwork = () => network.concat(state.exampleNet.map(x => Object.assign({ example:true }, x)));
+
+/* ---------- storage ---------- */
+const LS_KEY = "outreach-tracker-v1", LS_NET = "outreach-tracker-net-v1", NET_CHUNK = 1200;
+let store = { kind:"memory" };
+let saveTimer = null, saving = false, pendingSave = false;
+function setStatus(kind, text){ $("#status").innerHTML = '<span class="dot ' + (kind || "") + '"></span><span>' + esc(text) + "</span>"; }
+function save(){
+  if(!loaded) return;
+  clearTimeout(saveTimer);
+  setStatus("warn", "Saving…");
+  saveTimer = setTimeout(flush, 700);
+}
+function fallbackToLocal(){ store = { kind:"local" }; }
+async function flush(){
+  if(saving){ pendingSave = true; return; }
+  saving = true;
+  const json = JSON.stringify(state);
+  try{
+    if(store.kind === "db"){
+      await store.base.doc("tracker").set({ v:2, json, updatedAt:new Date().toISOString() });
+      setStatus("ok", "Saved to your account");
+    } else if(store.kind === "local"){
+      localStorage.setItem(LS_KEY, json);
+      setStatus("warn", "Saved in this browser only");
+    } else setStatus("bad", "Not saved: storage unavailable");
+  } catch(e){
+    if(store.kind === "db" && e && ["invalid_argument","revoked","not_granted"].includes(e.code)){
+      fallbackToLocal();
+      try{ localStorage.setItem(LS_KEY, json); setStatus("warn", "Saved in this browser only"); } catch(_){ setStatus("bad", "Not saved: storage unavailable"); }
+    } else if(e && e.code === "quota_exceeded") setStatus("bad", "Not saved: storage is full. Delete closed contacts.");
+    else setStatus("bad", "Couldn't save. Will retry on your next change.");
+  }
+  saving = false;
+  if(pendingSave){ pendingSave = false; flush(); }
+}
+const packNet = list => list.map(p => [p.name, p.slug, p.company, p.title, p.on]);
+const unpackNet = rows => rows.map(r => ({ name:r[0], slug:r[1], url: r[1] ? "https://www.linkedin.com/in/" + r[1] + "/" : "", company:r[2], title:r[3], on:r[4] }));
+async function saveNetwork(list){
+  network = list;
+  const rows = packNet(list);
+  if(store.kind === "db"){
+    try{
+      const prev = await store.base.doc("netmeta").get();
+      const prevChunks = prev.exists ? (prev.data().chunks || 0) : 0;
+      const chunks = Math.ceil(rows.length / NET_CHUNK);
+      for(let i = 0; i < chunks; i++){
+        await store.base.doc("net-" + i).set({ rows: JSON.stringify(rows.slice(i * NET_CHUNK, (i + 1) * NET_CHUNK)) });
+      }
+      await store.base.doc("netmeta").set({ chunks, count: rows.length, updatedAt: new Date().toISOString() });
+      for(let i = chunks; i < prevChunks; i++){ try{ await store.base.doc("net-" + i).delete(); } catch(_){} }
+      return true;
+    } catch(e){ setStatus("bad", "Couldn't save your connections list. Warm paths will last until you leave this page."); return false; }
+  }
+  try{ localStorage.setItem(LS_NET, JSON.stringify(rows)); return true; } catch(_){ return false; }
+}
+async function loadNetwork(){
+  try{
+    if(store.kind === "db"){
+      const meta = await store.base.doc("netmeta").get();
+      if(!meta.exists) return;
+      const n = meta.data().chunks || 0, out = [];
+      for(let i = 0; i < n; i++){
+        const d = await store.base.doc("net-" + i).get();
+        if(d.exists){ try{ out.push(...JSON.parse(d.data().rows)); } catch(_){} }
+      }
+      network = unpackNet(out);
+    } else {
+      const raw = localStorage.getItem(LS_NET);
+      if(raw) network = unpackNet(JSON.parse(raw));
+    }
+  } catch(_){}
+  render();
+}
+function normalize(s){
+  const b = blankState();
+  const out = Object.assign(b, s || {});
+  out.profile = Object.assign(blankState().profile, (s && s.profile) || {});
+  out.settings = Object.assign(blankState().settings, (s && s.settings) || {});
+  out.meta = Object.assign(blankState().meta, (s && s.meta) || {});
+  out.jobs = (Array.isArray(out.jobs) ? out.jobs : []).map(j => Object.assign({ posting:"", fitLine:"", analysis:null }, j));
+  out.contacts = (Array.isArray(out.contacts) ? out.contacts : []).map(c => mkContact(c));
+  out.exampleNet = Array.isArray(out.exampleNet) ? out.exampleNet : [];
+  return out;
+}
+function loadLocal(){
+  try{ const raw = localStorage.getItem(LS_KEY); if(raw) return normalize(JSON.parse(raw)); } catch(_){}
+  return null;
+}
+function finishLoad(s, mode){
+  if(s) state = s; else { state = blankState(); exampleData(state); }
+  loaded = true;
+  setStatus(mode === "db" ? "ok" : "warn", mode === "db" ? "Saved to your account" : "Saved in this browser only");
+  render();
+  loadNetwork();
+}
+let sample = null;
+async function init(){
+  render();
+  const C = window.claude;
+  if(!C || typeof C.use !== "function"){ fallbackToLocal(); finishLoad(loadLocal(), "local"); return; }
+  C.use("sample").then(s => { sample = s || null; if(loaded) render(); }).catch(() => {});
+  let db = null, user = null, id = null;
+  try{ [db, user] = await Promise.all([C.use("db"), C.use("user")]); } catch(_){}
+  try{ id = user ? await user.id() : null; } catch(_){}
+  if(!db || !id){ fallbackToLocal(); finishLoad(loadLocal(), "local"); return; }
+  const base = db.collection("data/users/" + id);
+  let settled = false;
+  const timer = setTimeout(() => {
+    if(settled) return; settled = true;
+    fallbackToLocal(); finishLoad(loadLocal(), "local");
+    setStatus("warn", "Couldn't reach your saved data. Saving in this browser for now.");
+  }, 10000);
+  try{
+    const snap = await base.doc("tracker").get();
+    if(settled) return; settled = true; clearTimeout(timer);
+    store = { kind:"db", base };
+    let s = null;
+    if(snap.exists){ try{ s = normalize(JSON.parse(snap.data().json)); } catch(_){} }
+    if(!s) s = loadLocal();
+    finishLoad(s, "db");
+    if(!snap.exists && s) save();
+  } catch(e){
+    if(settled) return; settled = true; clearTimeout(timer);
+    fallbackToLocal(); finishLoad(loadLocal(), "local");
+  }
+}
+
+/* ---------- Claude helpers ---------- */
+function parseLoose(t){
+  t = String(t || "");
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if(a < 0 || b < a) throw { code:"bad_json", message:"No JSON in reply" };
+  return JSON.parse(t.slice(a, b + 1));
+}
+async function askJSON(prompt){
+  if(typeof sample.json === "function"){
+    try{ const v = await sample.json(prompt); if(v && typeof v === "object") return v; }
+    catch(e){ if(e && (e.code === "not_granted" || e.code === "rate_limited")) throw e; }
+  }
+  const r = await sample(prompt + "\n\nReply with the JSON object only, no other text.");
+  return parseLoose(r.text);
+}
+function claudeErr(e){
+  if(e && e.code === "not_granted"){ sample = null; return "Claude isn't available here"; }
+  if(e && e.code === "rate_limited") return "Busy, try again in a minute";
+  return "Couldn't finish. Try again";
+}
+function profileText(){
+  const p = state.profile;
+  return "Name: " + (p.name || "(not given)") + "\nCurrent title: " + (p.title || "(not given)") + "\nYears of experience: " + (p.years || "(not given)") +
+    "\nTargeting: " + (p.targets || "(not given)") + "\nSkills: " + (p.skills || "(not given)") + "\nStrongest result: " + (p.highlight || "(not given)") +
+    (p.resume ? "\nResume link: " + p.resume : "");
+}
+
+/* ---------- message templates ---------- */
+function ctx(c){
+  const p = state.profile, j = jobById(c.jobId);
+  const fit = (j && j.fitLine) ? stripDot(j.fitLine) : (p.highlight ? stripDot(p.highlight) : "[One line on your best result, e.g. I cut weekly reporting time by 40% using SQL and Python]");
+  return {
+    first: firstName(c.name), company: (j && j.company) || c.company || "your company", role: j ? j.role : "", applied: !!(j && j.applied), job: j,
+    me: p.name ? firstName(p.name) : "", title: p.title || "[your current title]", years: p.years, targets: p.targets || "[the roles you want]",
+    skills: p.skills, fit, resume: p.resume, email: p.email
+  };
+}
+function hookLine(x){
+  if(x.years && x.skills) return " I have " + stripDot(x.years) + " years of experience in " + stripDot(x.skills) + ".";
+  if(x.skills) return " I work in " + stripDot(x.skills) + ".";
+  return "";
+}
+function tplConnect(c){
+  const x = ctx(c);
+  let base;
+  if(x.role && c.type === "recruiter") base = "Hi " + x.first + ", I applied for the " + x.role + " role at " + x.company + " and would love to connect.";
+  else if(x.role && c.type === "manager") base = "Hi " + x.first + ", I'm interested in the " + x.role + " opening on your team at " + x.company + " and would love to connect.";
+  else if(x.role) base = "Hi " + x.first + ", I'm interested in the " + x.role + " role at " + x.company + " and would love to connect.";
+  else base = "Hi " + x.first + ", I'm a " + x.title + " exploring " + x.targets + " roles and would love to connect.";
+  const withHook = base + hookLine(x);
+  return withHook.length <= 200 ? withHook : base;
+}
+function tplFollow(c){
+  const x = ctx(c);
+  const sign = x.me ? "\n\n" + x.me : "";
+  const resume = x.resume ? " Here's my resume: " + x.resume : " Happy to send my resume.";
+  if(c.type === "referral"){
+    if(x.role) return "Hi " + x.first + ", hope you're doing well! I'm applying for the " + x.role + " role at " + x.company + " and saw you're there. " + x.fit + ".\n\n" +
+      "Would you be open to referring me, or telling me a bit about the team? I can send my resume and a two-line blurb to make it easy." + sign;
+    return "Hi " + x.first + ", hope you're doing well! I'm looking for " + x.targets + " roles and noticed you're at " + x.company + ". " + x.fit + ".\n\n" +
+      "Is your company hiring for anything like that? If something fits, would you be open to referring me?" + sign;
+  }
+  if(x.role && c.type === "recruiter")
+    return "Thanks for connecting, " + x.first + "! I " + (x.applied ? "applied" : "am applying") + " for the " + x.role + " role at " + x.company + ". Quick background: " + x.fit + ".\n\n" +
+      "Would you be the right person to talk to about this role, or could you point me to whoever is?" + resume + sign;
+  if(x.role && c.type === "manager")
+    return "Thanks for connecting, " + x.first + ". I'm excited about the " + x.role + " opening on your team" + (x.applied ? " and have applied" : "") + ". " + x.fit + ".\n\n" +
+      "If you have 10 minutes in the next couple of weeks, I'd love to hear what matters most to you for this hire. Either way, thanks for connecting." + sign;
+  if(x.role)
+    return "Thanks for connecting, " + x.first + "! I'm interested in the " + x.role + " role at " + x.company + ". " + x.fit + ".\n\nDo you know who I should talk to about it? Any pointer would mean a lot." + sign;
+  return "Thanks for connecting, " + x.first + "! I'm a " + x.title + " looking for " + x.targets + " roles. " + x.fit + ".\n\n" +
+    "Is " + x.company + " hiring for anything like that, or is there someone on your team I should talk to?" + resume + sign;
+}
+function tplNudge(c){
+  const x = ctx(c);
+  const sign = x.me ? "\n\n" + x.me : "";
+  if(c.type === "referral") return "Hi " + x.first + ", just following up on my note" + (x.role ? " about the " + x.role + " role" : "") + ". No pressure at all. If a referral isn't possible, any tips on the team would still help a lot." + sign;
+  if(x.role) return "Hi " + x.first + ", bringing this back to the top of your inbox. I'm still very interested in the " + x.role + " role at " + x.company + " and happy to share anything that would help." + sign;
+  return "Hi " + x.first + ", bringing this back to the top of your inbox. I'm still keen to hear about " + x.targets + " openings at " + x.company + ", and happy to share my resume." + sign;
+}
+const KIND = {
+  connect: { label:"Connection note", tpl: tplConnect, limit: 200, short: true },
+  follow:  { label:"Message", tpl: tplFollow, limit: 700 },
+  nudge:   { label:"Follow-up nudge", tpl: tplNudge, limit: 350, short: true }
+};
+const msgFor = (c, kind) => (c.msgs && c.msgs[kind]) || KIND[kind].tpl(c);
+
+/* Reply coach situations (work without Claude) */
+const SITUATIONS = {
+  resume: { label:"Asked for my resume", tpl: x => "Thanks so much, " + x.first + "! " + (x.resume ? "Here it is: " + x.resume : "I've attached it here.") + "\n\nThe short version: " + x.fit + ". Let me know if anything else would help." },
+  apply:  { label:"Said apply online first", tpl: x => "Thanks, " + x.first + "! I've " + (x.applied ? "already applied" : "just applied") + (x.role ? " for the " + x.role + " role" : "") + ". If you're able to flag my application to the team, I'd really appreciate it. Happy to answer anything in the meantime." },
+  nothiring: { label:"Not hiring right now", tpl: x => "Thanks for letting me know, " + x.first + ", I appreciate the straight answer. Would it be okay if I check back in a couple of months? And if you know anyone hiring for " + x.targets + " roles, I'd be grateful for an intro." },
+  other:  { label:"Pointed me to someone else", tpl: x => "Thank you, " + x.first + "! Would you be comfortable making a quick intro, or should I reach out to them directly and mention you suggested it?" },
+  chat:   { label:"Wants to talk", tpl: x => "That would be great, " + x.first + "! I'm free [two or three times that work for you]. Happy to work around your schedule." + (x.email ? " My email is " + x.email + " if that's easier." : "") },
+  referred: { label:"Agreed to refer me", tpl: x => "Thank you so much, " + x.first + ", that means a lot! " + (x.resume ? "Here's my resume: " + x.resume + ". " : "I'll send my resume over. ") + "If it helps, here's a short blurb you can paste: \"" + (x.me || "[Your name]") + " is a " + x.title + " and " + x.fit.charAt(0).toLowerCase() + x.fit.slice(1) + ".\"" }
+};
+
+/* ---------- derived ---------- */
+const isReplied = c => !!c.repliedOn || c.stage === "replied" || c.outcome === "interview" || c.outcome === "referral";
+function knownAt(company){
+  if(!company) return [];
+  return allNetwork().filter(p => sameCompany(p.company, company));
+}
+function isTracked(p){
+  const s = p.slug;
+  return state.contacts.some(c => (s && slugOf(c.url) === s) || nameKey(c.name) === nameKey(p.name));
+}
+function warmOpenings(){
+  return state.jobs.map(j => ({ job:j, people: knownAt(j.company).filter(p => !isTracked(p)) })).filter(x => x.people.length);
+}
+function buckets(){
+  const n = Number(state.settings.nudgeAfter) || 7;
+  const live = state.contacts.filter(c => c.stage !== "closed");
+  return {
+    follow: live.filter(c => c.stage === "accepted"),
+    nudge: live.filter(c => c.stage === "messaged" && (daysSince(c.messagedOn) ?? 0) >= n),
+    connect: live.filter(c => c.stage === "to_connect"),
+    waiting: live.filter(c => c.stage === "requested"),
+    awaitingReply: live.filter(c => c.stage === "messaged" && (daysSince(c.messagedOn) ?? 0) < n),
+    cold: live.filter(c => c.stage === "followed_up"),
+    replied: live.filter(c => c.stage === "replied"),
+    sentToday: state.contacts.filter(c => c.requestedOn && daysSince(c.requestedOn) === 0).length
+  };
+}
+
+/* ---------- rendering ---------- */
+let view = "today";
+const VIEWS = ["today","jobs","insights","import","profile"];
+function setViewFromHash(){ const h = (location.hash || "").replace("#", ""); view = VIEWS.includes(h) ? h : "today"; }
+function render(){
+  document.querySelectorAll("#tabs a").forEach(a => { if(a.dataset.view === view) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  if(loaded){
+    const b = buckets();
+    const todo = b.follow.length + b.nudge.length + b.replied.length;
+    document.querySelector('#tabs a[data-view="today"]').innerHTML = "Today" + (todo ? '<span class="count">' + todo + "</span>" : "");
+  }
+  const main = $("#main");
+  if(!loaded){ main.innerHTML = '<p class="empty">Loading your tracker…</p>'; return; }
+  main.innerHTML = view === "jobs" ? renderJobs() : view === "insights" ? renderInsights() : view === "import" ? renderImport() : view === "profile" ? renderProfile() : renderToday();
+  if(view === "import") wireDrop();
+}
+function stagePill(c){ return '<span class="pill st-' + c.stage + '">' + (c.stage === "closed" && c.outcome ? OUTCOMES[c.outcome] : STAGES[c.stage]) + "</span>"; }
+function whoBlock(c){
+  const j = jobById(c.jobId);
+  return '<div class="who"><h3>' + esc(c.name) + (c.example ? ' <span class="chip">Example</span>' : "") + "</h3>" +
+    '<div class="meta">' + esc(c.title || TYPES[c.type]) + (c.company || (j && j.company) ? " · " + esc(c.company || j.company) : "") + "</div></div>";
+}
+function typeChip(c){ return c.type === "referral" ? '<span class="chip warmchip">You know them</span>' : '<span class="chip">' + TYPES[c.type] + "</span>"; }
+function profileLink(c){
+  if(c.url) return '<a class="btn" href="' + esc(c.url) + '" target="_blank" rel="noopener noreferrer">Open profile ↗</a>';
+  return '<a class="btn" href="' + liSearch(c.name + " " + (c.company || (jobById(c.jobId) || {}).company || "")) + '" target="_blank" rel="noopener noreferrer">Find on LinkedIn ↗</a>';
+}
+function counterHTML(text, limit){
+  const n = text.length;
+  return '<span class="' + (n > limit ? "over" : "") + '">' + n + " / " + limit + " characters</span>" + (n > limit && limit === 200 ? " · shorten it so it fits in a connection note" : "");
+}
+function msgCard(c, kind, primaryLabel, primaryAct, extra){
+  const k = KIND[kind];
+  const text = msgFor(c, kind);
+  const edited = !!(c.msgs && c.msgs[kind]);
+  const j = jobById(c.jobId);
+  const timing = kind === "follow" ? (c.type === "referral" ? "Already connected" : "Accepted " + ago(c.acceptedOn))
+    : kind === "nudge" ? "Messaged " + ago(c.messagedOn) + ", no reply" : (j ? "For " + j.role : "No job linked");
+  const label = kind === "follow" ? (c.type === "referral" ? "Referral request" : "Message after they accept") : k.label;
+  const fitHint = j && !j.fitLine && kind !== "connect" ? '<span>Tip: add a fit line for this job in <a href="#jobs">Jobs</a> to make this specific.</span>' : "<span></span>";
+  return '<article class="card' + (c.type === "referral" ? " warmcard" : "") + '" data-id="' + c.id + '">' +
+    '<div class="card-top">' + whoBlock(c) + '<div class="chips">' + typeChip(c) + (j && kind !== "connect" ? '<span class="chip">' + esc(j.role) + "</span>" : "") + '<span class="chip">' + esc(timing) + "</span></div></div>" +
+    '<label for="m-' + c.id + "-" + kind + '">' + label + "</label>" +
+    '<textarea class="msg' + (k.short ? " short" : "") + '" id="m-' + c.id + "-" + kind + '" data-kind="' + kind + '" data-id="' + c.id + '">' + esc(text) + "</textarea>" +
+    '<div class="msg-foot"><span class="mono" data-counter="' + c.id + "-" + kind + '">' + counterHTML(text, k.limit) + "</span>" +
+      '<span class="actions">' + (edited ? '<button class="ghost" data-act="reset" data-kind="' + kind + '" data-id="' + c.id + '">Reset to template</button>' : "") +
+      (sample ? '<button class="ghost" data-act="ai" data-kind="' + kind + '" data-id="' + c.id + '">Rewrite with Claude</button>' : "") + "</span></div>" +
+    '<div class="msg-foot">' + fitHint + "</div>" +
+    '<div class="actions"><button data-act="copy" data-kind="' + kind + '" data-id="' + c.id + '">Copy message</button>' + profileLink(c) +
+      '<button class="primary" data-act="' + primaryAct + '" data-id="' + c.id + '">' + primaryLabel + "</button>" + (extra || "") + "</div></article>";
+}
+function threadHTML(c){
+  if(!c.thread || !c.thread.length) return "";
+  return '<div class="thread">' + c.thread.slice(-4).map(t => '<div class="bubble ' + t.from + '"><small>' + (t.from === "me" ? "You" : esc(firstName(c.name))) + " · " + fmtDate(t.on) + "</small>" + esc(t.text) + "</div>").join("") + "</div>";
+}
+function coachCard(c){
+  const j = jobById(c.jobId);
+  const sits = Object.keys(SITUATIONS).map(k => '<button class="small" data-act="sit" data-sit="' + k + '" data-id="' + c.id + '">' + SITUATIONS[k].label + "</button>").join("");
+  return '<article class="card' + (c.type === "referral" ? " warmcard" : "") + '" data-id="' + c.id + '">' +
+    '<div class="card-top">' + whoBlock(c) + '<div class="chips">' + typeChip(c) + (j ? '<span class="chip">' + esc(j.role) + "</span>" : "") + '<span class="chip">Replied ' + esc(ago(c.repliedOn)) + "</span></div></div>" +
+    threadHTML(c) +
+    '<label for="r-' + c.id + '">Paste what they said</label>' +
+    '<textarea class="msg short" id="r-' + c.id + '" data-coach="their" data-id="' + c.id + '" placeholder="Paste their reply from LinkedIn">' + esc(c.theirDraft) + "</textarea>" +
+    '<div class="actions">' + (sample ? '<button class="primary" data-act="coach" data-id="' + c.id + '">Suggest my answer</button><span class="note" style="margin:0">or pick what they said:</span>' : '<span class="note" style="margin:0">Pick what they said:</span>') + "</div>" +
+    '<div class="sitbar">' + sits + "</div>" +
+    (c.coach && c.coach.advice ? '<div class="advice"><b>' + esc(c.coach.situation || "Suggestion") + ".</b> " + esc(c.coach.advice) + "</div>" : "") +
+    '<label for="a-' + c.id + '">Your answer</label>' +
+    '<textarea class="msg" id="a-' + c.id + '" data-coach="mine" data-id="' + c.id + '" placeholder="Your suggested answer appears here. Edit it before you send.">' + esc(c.myDraft) + "</textarea>" +
+    '<div class="actions"><button data-act="copy-answer" data-id="' + c.id + '">Copy answer</button>' + profileLink(c) +
+      '<button class="primary" data-act="sent-answer" data-id="' + c.id + '">I sent it</button></div>' +
+    '<div class="actions"><span class="note" style="margin:0">How did it go?</span>' +
+      Object.keys(OUTCOMES).map(o => '<button class="small" data-act="outcome" data-out="' + o + '" data-id="' + c.id + '">' + OUTCOMES[o] + "</button>").join("") + "</div></article>";
+}
+
+function renderToday(){
+  const b = buckets();
+  const p = state.profile;
+  const warm = warmOpenings();
+  const warmCount = warm.reduce((n, w) => n + w.people.length, 0);
+  let h = "";
+  if(hasExamples()) h += '<div class="banner"><span>You\'re looking at example data so you can see how everything works. Remove it when you start adding your own.</span><button data-act="clear-examples">Remove examples</button></div>';
+  if(!p.highlight || !p.name) h += '<div class="banner warn"><span>Fill in your profile so every draft mentions your name and your strongest result.</span><a class="btn" href="#profile">Open my profile</a></div>';
+  h += '<div class="stats">' +
+    stat(b.replied.length, "Replied, answer them", b.replied.length ? "hot" : "") +
+    stat(b.follow.length, "Ready to message", b.follow.length ? "hot" : "") +
+    stat(warmCount, "People you know at your target companies", warmCount ? "warmth" : "") +
+    stat(b.nudge.length, "Nudge due", b.nudge.length ? "due" : "") +
+    stat(b.connect.length, "Requests to send", "") +
+    stat(b.sentToday + " / " + (state.settings.dailyGoal || 10), "Requests sent today", "") + "</div>";
+
+  if(b.replied.length){
+    h += '<section class="block"><div class="block-head"><h2>Answer replies</h2><p>Paste what they said and get a suggested answer.</p></div><div class="cards">' + b.replied.map(coachCard).join("") + "</div></section>";
+  }
+  if(warm.length){
+    h += '<section class="block"><div class="block-head"><h2>Warm paths</h2><p>You already know people at these companies. A referral usually beats a cold message.</p></div><div class="compact">' +
+      warm.map(w => '<div class="row"><div class="who"><h3>' + esc(w.job.company) + '</h3><div class="meta">' + esc(w.job.role) + "</div></div>" +
+        '<div class="chips"><span class="chip warmchip">' + w.people.length + (w.people.length === 1 ? " person" : " people") + " you know</span>" +
+        w.people.slice(0, 3).map(x => '<span class="chip">' + esc(x.name) + "</span>").join("") + "</div>" +
+        '<div class="actions"><a class="btn" href="#jobs" data-act="goto-job" data-job="' + w.job.id + '">See them</a></div></div>').join("") + "</div></section>";
+  }
+  h += '<section class="block"><div class="block-head"><h2>Send your message</h2><p>They\'re connected. Message them while you\'re fresh in their notifications.</p></div>';
+  h += b.follow.length ? '<div class="cards">' + b.follow.map(c => msgCard(c, "follow", "I sent it", "sent-follow", '<button class="ghost" data-act="replied" data-id="' + c.id + '">They messaged first</button>')).join("") + "</div>"
+    : '<p class="empty">Nobody is waiting on a message. When someone accepts, mark them accepted or import your LinkedIn connections.</p>';
+  h += "</section>";
+  if(b.nudge.length){
+    h += '<section class="block"><div class="block-head"><h2>Nudge once</h2><p>No reply after ' + (state.settings.nudgeAfter || 7) + ' days. One short nudge, then let it go.</p></div><div class="cards">' +
+      b.nudge.map(c => msgCard(c, "nudge", "I sent the nudge", "sent-nudge", '<button data-act="replied" data-id="' + c.id + '">They replied</button>')).join("") + "</div></section>";
+  }
+  h += '<section class="block"><div class="block-head"><h2>Send connection requests</h2><p>On their profile, choose Connect, then Add a note, and paste this.</p></div>';
+  h += b.connect.length ? '<div class="cards">' + b.connect.map(c => msgCard(c, "connect", "I sent the request", "sent-request")).join("") + "</div>"
+    : '<p class="empty">No one queued. Add a job and the people for it in <a href="#jobs">Jobs &amp; contacts</a>.</p>';
+  h += "</section>";
+  const nA = state.settings.nudgeAfter || 7;
+  const waitRows = b.waiting.map(c => compactRow(c, "Sent " + ago(c.requestedOn) + (daysSince(c.requestedOn) >= 21 ? " · consider withdrawing" : ""), '<button class="primary" data-act="accepted" data-id="' + c.id + '">Mark accepted</button>'))
+    .concat(b.awaitingReply.map(c => compactRow(c, "Messaged " + ago(c.messagedOn) + " · nudge in " + Math.max(0, nA - daysSince(c.messagedOn)) + " days", '<button data-act="replied" data-id="' + c.id + '">They replied</button>')))
+    .concat(b.cold.map(c => compactRow(c, "Nudged " + ago(c.nudgedOn) + (daysSince(c.nudgedOn) >= 7 ? " · time to move on" : ""), '<button data-act="replied" data-id="' + c.id + '">They replied</button><button class="ghost" data-act="outcome" data-out="no" data-id="' + c.id + '">Close</button>')));
+  h += '<section class="block"><div class="block-head"><h2>Waiting</h2><p>Nothing to do yet.</p></div>' + (waitRows.length ? '<div class="compact">' + waitRows.join("") + "</div>" : '<p class="empty">Nothing pending.</p>') + "</section>";
+  return h;
+}
+function stat(n, label, cls){ return '<div class="stat ' + cls + '"><b>' + n + "</b><span>" + label + "</span></div>"; }
+function compactRow(c, info, actions){
+  const j = jobById(c.jobId);
+  return '<div class="row">' + whoBlock(c) + '<div class="chips">' + stagePill(c) + (j ? '<span class="chip">' + esc(j.role) + "</span>" : "") + '<span class="chip">' + esc(info) + "</span></div>" +
+    '<div class="actions">' + actions + "</div></div>";
+}
+
+/* Jobs */
+function renderJobs(){
+  let h = '<p class="tip">For each opening: paste the job posting, add the recruiter and hiring manager, and check who you already know there.</p>';
+  h += '<section class="block panel"><h2>Add a job</h2><form class="grid" data-form="job">' +
+    '<label>Company<input name="company" id="job-company" required placeholder="e.g. Stripe"></label>' +
+    '<label>Role<input name="role" id="job-role" required placeholder="e.g. Data Analyst"></label>' +
+    '<label>Posting link (optional)<input name="link" id="job-link" type="url" placeholder="https://"></label>' +
+    '<label class="check"><input type="checkbox" name="applied" id="job-applied"> I\'ve applied</label>' +
+    '<label class="full">Job description (optional, paste it to get tailored messages)<textarea class="posting" name="posting" id="job-posting" placeholder="Paste the full job posting here"></textarea></label>' +
+    '<button class="primary" type="submit">Add job</button></form></section>';
+  if(!state.jobs.length) h += '<p class="empty" style="margin-bottom:16px">No jobs yet. Add the first one above.</p>';
+  state.jobs.forEach(j => { h += jobCard(j); });
+  const loose = state.contacts.filter(c => !jobById(c.jobId));
+  h += '<div class="job"><div class="job-head"><div><h3>Not linked to a job</h3><div class="meta">General networking with recruiters and managers.</div></div></div>' +
+    loose.map(contactRow).join("") + '<div class="job-sec tint">' + contactForm("") + "</div></div>";
+  return h;
+}
+function jobCard(j){
+  const cs = state.contacts.filter(c => c.jobId === j.id);
+  const known = knownAt(j.company);
+  const a = j.analysis;
+  let h = '<div class="job" id="job-' + j.id + '"><div class="job-head"><div><h3>' + esc(j.role) + " · " + esc(j.company) + (j.example ? ' <span class="chip">Example</span>' : "") + '</h3><div class="meta">' +
+    (j.applied ? "Applied" + (j.appliedOn ? " " + fmtDate(j.appliedOn) : "") : "Not applied yet") + (j.link ? ' · <a href="' + esc(j.link) + '" target="_blank" rel="noopener noreferrer">Posting ↗</a>' : "") + "</div></div>" +
+    '<div class="actions"><label class="check"><input type="checkbox" data-act="toggle-applied" data-job="' + j.id + '"' + (j.applied ? " checked" : "") + "> Applied</label>" +
+    '<button class="ghost danger" data-act="del-job" data-job="' + j.id + '">Delete job</button></div></div>';
+
+  // Fit + posting
+  h += '<div class="job-sec tint"><h4>Why you fit</h4>' +
+    '<label for="fit-' + j.id + '">One line used in every message for this job</label>' +
+    '<input id="fit-' + j.id + '" data-jobfield="fitLine" data-job="' + j.id + '" value="' + esc(j.fitLine) + '" placeholder="e.g. I\'ve built Tableau sales dashboards on Snowflake and cut weekly reporting from 6 hours to 30 minutes">' +
+    '<details style="margin-top:10px"' + (j.posting && !a ? " open" : "") + "><summary>" + (j.posting ? "Job posting" : "Paste the job posting") + "</summary>" +
+    '<textarea class="posting" id="post-' + j.id + '" data-jobfield="posting" data-job="' + j.id + '" placeholder="Paste the full job description">' + esc(j.posting) + "</textarea>" +
+    '<div class="actions" style="margin-top:8px">' + (sample ? '<button class="primary" data-act="analyze" data-job="' + j.id + '"' + (j.posting ? "" : " disabled") + ">" + (a ? "Analyze again" : "Analyze with Claude") + "</button>" : '<span class="note" style="margin:0">Claude analysis isn\'t available in this view. Write the fit line yourself above.</span>') + "</div></details>";
+  if(a){
+    h += '<div style="margin-top:12px"><h4>What they care about most</h4><ul class="reqs">' +
+      (a.requirements || []).map(r => "<li><span>" + esc(r.requirement) + '</span><span class="ev' + (r.evidence ? "" : " gap") + '">' + esc(r.evidence || "Not in your profile yet. Mention it if you have it.") + "</span></li>").join("") + "</ul>";
+    if(a.gaps && a.gaps.length) h += '<p class="note">Possible gaps: ' + esc(a.gaps.join("; ")) + "</p>";
+    h += "</div>";
+  }
+  const titles = (a && a.manager_titles && a.manager_titles.length) ? a.manager_titles : [j.role + " manager", "Head of " + (j.role.split(" ").slice(-2, -1)[0] || "team")];
+  h += '<div style="margin-top:12px"><h4>Find the right people</h4><div class="actions">' +
+    titles.slice(0, 3).map(t => '<a class="btn" href="' + liSearch(t + " " + j.company) + '" target="_blank" rel="noopener noreferrer">' + esc(t) + " ↗</a>").join("") +
+    '<a class="btn" href="' + liSearch("recruiter " + j.company) + '" target="_blank" rel="noopener noreferrer">Recruiters ↗</a></div>' +
+    '<p class="note">Opens a LinkedIn search. Add the people you pick below.</p></div></div>';
+
+  // Warm paths
+  h += '<div class="job-sec warmsec"><h4>People you already know at ' + esc(j.company) + "</h4>";
+  if(known.length){
+    h += '<div class="compact">' + known.slice(0, 10).map(p => {
+      const tracked = isTracked(p);
+      return '<div class="row"><div class="who"><h3>' + esc(p.name) + (p.example ? ' <span class="chip">Example</span>' : "") + '</h3><div class="meta">' + esc(p.title || "") + " · connected " + esc(fmtDate(p.on)) + "</div></div>" +
+        '<div class="actions">' + (tracked ? '<span class="chip">Added</span>' : '<button class="warmbtn" data-act="add-warm" data-job="' + j.id + '" data-name="' + esc(p.name) + '">Ask for a referral</button>') + "</div></div>";
+    }).join("") + "</div>" + (known.length > 10 ? '<p class="note">and ' + (known.length - 10) + " more.</p>" : "");
+  } else {
+    h += '<p class="note" style="margin:0">' + (network.length ? "Nobody in your connections works here yet. Ask friends if they know someone." : 'Import your LinkedIn connections to see who you already know here. <a href="#import">Import</a>') + "</p>";
+  }
+  h += "</div>";
+
+  h += cs.length ? '<div class="job-sec" style="padding:0">' + cs.map(contactRow).join("") + "</div>" : '<div class="job-sec"><span class="note" style="margin:0">No contacts yet. Add the recruiter and the hiring manager below.</span></div>';
+  h += '<div class="job-sec tint">' + contactForm(j.id) + "</div></div>";
+  return h;
+}
+function contactForm(jobId){
+  const k = jobId || "none";
+  return '<details><summary>Add a contact</summary><form class="grid" data-form="contact" data-job="' + jobId + '">' +
+    '<label>Name<input name="name" id="cn-' + k + '" required placeholder="Full name"></label>' +
+    '<label>Title<input name="title" id="ct-' + k + '" placeholder="e.g. Senior Recruiter"></label>' +
+    '<label>Type<select name="type" id="cy-' + k + '"><option value="recruiter">Recruiter</option><option value="manager">Hiring manager</option><option value="referral">Someone I know (ask for referral)</option><option value="other">Other</option></select></label>' +
+    '<label>Profile link (optional)<input name="url" id="cu-' + k + '" placeholder="linkedin.com/in/…"></label>' +
+    '<label>Status<select name="stage" id="cs-' + k + '"><option value="to_connect">Not connected yet</option><option value="requested">Request already sent</option><option value="accepted">Already connected</option></select></label>' +
+    '<button class="primary" type="submit">Add contact</button></form></details>';
+}
+function contactRow(c){
+  const opts = Object.keys(STAGES).map(s => '<option value="' + s + '"' + (s === c.stage ? " selected" : "") + ">" + STAGES[s] + "</option>").join("");
+  const dates = [c.requestedOn && "requested " + fmtDate(c.requestedOn), c.acceptedOn && "connected " + fmtDate(c.acceptedOn), c.messagedOn && "messaged " + fmtDate(c.messagedOn), c.repliedOn && "replied " + fmtDate(c.repliedOn)].filter(Boolean).join(" · ");
+  return '<div class="row">' + whoBlock(c) +
+    '<div class="chips">' + typeChip(c) + (c.outcome ? '<span class="chip">' + OUTCOMES[c.outcome] + "</span>" : "") + (dates ? '<span class="chip">' + esc(dates) + "</span>" : "") + "</div>" +
+    '<div class="actions"><select id="st-' + c.id + '" data-act="stage" data-id="' + c.id + '" aria-label="Status for ' + esc(c.name) + '">' + opts + "</select>" +
+    '<input id="nt-' + c.id + '" data-act="note" data-id="' + c.id + '" value="' + esc(c.notes) + '" placeholder="Notes" aria-label="Notes for ' + esc(c.name) + '" style="width:170px">' +
+    profileLink(c) + '<button class="ghost danger" data-act="del-contact" data-id="' + c.id + '" aria-label="Delete ' + esc(c.name) + '">Delete</button></div></div>';
+}
+
+/* Insights */
+function rateOf(list){ const n = list.length, r = list.filter(isReplied).length; return { n, r, p: n ? Math.round(100 * r / n) : 0 }; }
+function barRows(groups, warmKey){
+  return '<div class="bars">' + groups.map(g => {
+    const x = rateOf(g.list);
+    return '<div class="bar-row"><span>' + esc(g.label) + '</span><div class="bar-track" role="img" aria-label="' + esc(g.label) + ": " + x.p + '% replied"><div class="bar-fill' + (warmKey && g.key === warmKey ? " warmfill" : "") + '" style="width:' + (x.n ? Math.max(x.p, 2) : 0) + '%"></div></div>' +
+      '<span class="bar-val">' + (x.n ? x.p + "% · " + x.r + " of " + x.n : "none yet") + "</span></div>";
+  }).join("") + "</div>";
+}
+function compare(aLabel, a, bLabel, b, noun){
+  const A = rateOf(a), B = rateOf(b), need = 5;
+  if(A.n < need || B.n < need){
+    const more = Math.max(0, need - A.n) + Math.max(0, need - B.n);
+    return { pending:true, text: "Send about " + more + " more " + (more === 1 ? noun.replace(/s$/, "") : noun) + " to compare " + aLabel.toLowerCase() + " with " + bLabel.toLowerCase() + "." };
+  }
+  const d = A.p - B.p;
+  if(Math.abs(d) < 10) return { text: aLabel + " and " + bLabel.toLowerCase() + " get similar reply rates (" + A.p + "% vs " + B.p + "%)." };
+  const [w, l, wp, lp] = d > 0 ? [aLabel, bLabel, A.p, B.p] : [bLabel, aLabel, B.p, A.p];
+  return { text: w + " got " + wp + "% replies, compared with " + lp + "% for " + l.toLowerCase() + "." };
+}
+function renderInsights(){
+  const all = state.contacts;
+  const sent = all.filter(c => c.messagedOn);
+  const requested = all.filter(c => c.requestedOn && c.type !== "referral");
+  const accepted = requested.filter(c => c.acceptedOn);
+  const wins = all.filter(c => c.outcome === "interview" || c.outcome === "referral");
+  const meta = c => c.sentMeta || {};
+  let h = "";
+  if(all.some(c => c.example && (c.messagedOn || c.requestedOn))) h += '<div class="banner"><span>These numbers include example outreach so you can see how this page works. Remove examples on the Today tab to see only yours.</span></div>';
+  h += '<div class="funnel">' +
+    '<div class="stat"><b>' + requested.length + "</b><span>Requests sent</span></div>" +
+    '<div class="stat"><b>' + accepted.length + "</b><span>Accepted</span><small>" + (requested.length ? Math.round(100 * accepted.length / requested.length) + "%" : "–") + "</small></div>" +
+    '<div class="stat"><b>' + sent.length + "</b><span>Messages sent</span></div>" +
+    '<div class="stat"><b>' + sent.filter(isReplied).length + "</b><span>Replies</span><small>" + (sent.length ? rateOf(sent).p + "%" : "–") + "</small></div>" +
+    '<div class="stat hot"><b>' + wins.length + "</b><span>Interviews or referrals</span></div></div>";
+
+  const ins = [
+    compare("Asking people you know", sent.filter(c => c.type === "referral"), "Cold messages", sent.filter(c => c.type !== "referral"), "messages"),
+    compare("Messages with a number", sent.filter(c => meta(c).hasNumber), "Messages without one", sent.filter(c => c.sentMeta && !meta(c).hasNumber), "messages"),
+    compare("Messages using your job fit line", sent.filter(c => meta(c).fit), "Generic messages", sent.filter(c => c.sentMeta && !meta(c).fit), "messages"),
+    compare("Hiring managers", sent.filter(c => c.type === "manager"), "Recruiters", sent.filter(c => c.type === "recruiter"), "messages")
+  ];
+  h += '<section class="block"><h2>What the numbers say</h2><ul class="insights">' + ins.map(i => '<li class="' + (i.pending ? "pending" : "") + '">' + esc(i.text) + "</li>").join("") + "</ul></section>";
+
+  h += '<section class="block panel"><h2>Reply rate by who you message</h2>' + barRows([
+    { label:"Someone you know", key:"referral", list: sent.filter(c => c.type === "referral") },
+    { label:"Hiring managers", key:"manager", list: sent.filter(c => c.type === "manager") },
+    { label:"Recruiters", key:"recruiter", list: sent.filter(c => c.type === "recruiter") }
+  ], "referral") + "</section>";
+  h += '<section class="block panel"><h2>Reply rate by what\'s in your message</h2>' + barRows([
+    { label:"Includes a number", list: sent.filter(c => meta(c).hasNumber) },
+    { label:"No number", list: sent.filter(c => c.sentMeta && !meta(c).hasNumber) },
+    { label:"Uses job fit line", list: sent.filter(c => meta(c).fit) },
+    { label:"Generic", list: sent.filter(c => c.sentMeta && !meta(c).fit) }
+  ]) + '<h2 style="margin-top:18px">By how it was written</h2>' + barRows([
+    { label:"Template as is", list: sent.filter(c => meta(c).src === "template") },
+    { label:"Edited by you", list: sent.filter(c => meta(c).src === "edited") },
+    { label:"Rewritten with Claude", list: sent.filter(c => meta(c).src === "ai") }
+  ]) + '<p class="note">Counts each person once, by the first message you sent them.</p></section>';
+  const days = accepted.map(c => daysSince(c.requestedOn) - daysSince(c.acceptedOn)).filter(d => d >= 0).sort((a, b) => a - b);
+  const median = days.length ? days[Math.floor(days.length / 2)] : null;
+  h += '<section class="block panel"><h2>Connection requests</h2>' +
+    '<div class="bars">' + [["Recruiters","recruiter"],["Hiring managers","manager"]].map(([l, t]) => {
+      const rq = requested.filter(c => c.type === t), ac = rq.filter(c => c.acceptedOn), p = rq.length ? Math.round(100 * ac.length / rq.length) : 0;
+      return '<div class="bar-row"><span>' + l + '</span><div class="bar-track"><div class="bar-fill" style="width:' + (rq.length ? Math.max(p, 2) : 0) + '%"></div></div><span class="bar-val">' + (rq.length ? p + "% accepted · " + ac.length + " of " + rq.length : "none yet") + "</span></div>";
+    }).join("") + "</div>" +
+    '<p class="note">' + (median != null ? "People usually accept within " + median + (median === 1 ? " day" : " days") + ". After 3 weeks, it's fine to withdraw and move on." : "You'll see how long people take to accept once a few have.") + "</p></section>";
+  return h;
+}
+
+/* Import */
+function renderImport(){
+  let h = '<div class="two"><section class="panel"><h2>Get your connections file from LinkedIn</h2><ol class="steps">' +
+    "<li>On LinkedIn, open <b>Settings &amp; Privacy</b>, then <b>Data privacy</b>, then <b>Get a copy of your data</b>.</li>" +
+    "<li>Pick the option to choose specific data, tick <b>Connections</b>, and request the archive.</li>" +
+    "<li>LinkedIn emails you when it's ready. Download it, unzip it, and find <b>Connections.csv</b>.</li>" +
+    "<li>Drop that file here. Repeat every few days to catch new acceptances.</li></ol>" +
+    '<p class="note">The file is read on this page only. Nothing is sent to LinkedIn. Your connections list is saved privately to your account so the tracker can show warm paths.</p></section>' +
+    '<section class="panel"><h2>Import</h2><div class="drop" id="drop"><p style="margin:0 0 10px">Drop <b>Connections.csv</b> here</p>' +
+    '<label class="btn" for="csv" style="display:inline-flex;color:var(--ink)">Choose file</label><input type="file" id="csv" accept=".csv,text/csv" style="display:none"></div>' +
+    '<p class="note">' + (state.meta.lastImportAt ? "Last import " + ago(state.meta.lastImportAt) + ", " + network.length + " connections." : "No imports yet.") + "</p></section></div>";
+  if(importResult){
+    const r = importResult;
+    h += '<section class="block" style="margin-top:22px"><div class="block-head"><h2>Results</h2><p>' + r.total + " connections read.</p></div>";
+    if(r.error) h += '<div class="banner warn">' + esc(r.error) + "</div>";
+    if(r.warm) h += '<div class="banner warm"><span>You know <b>' + r.warm + "</b> " + (r.warm === 1 ? "person" : "people") + " at your target companies. Ask them for referrals first.</span><a class=\"btn\" href=\"#today\">See warm paths</a></div>";
+    h += '<h3 style="margin:6px 0 8px">Accepted your request</h3>' + (r.matched.length
+      ? '<div class="compact">' + r.matched.map(m => { const c = contactById(m.id); return c ? compactRow(c, "Connected " + fmtDate(m.on), '<a class="btn" href="#today">Write message</a>') : ""; }).join("") + "</div>"
+      : '<p class="empty">None of your pending requests show up as accepted yet.</p>');
+    h += '<div class="block-head" style="margin-top:20px"><h3>New connections who might be hiring</h3>' + (r.candidates.length ? '<button data-act="add-all">Add all ' + r.candidates.length + "</button>" : "") + "</div>";
+    h += '<p class="note" style="margin:-4px 0 10px">Recruiters, talent partners and managers who connected ' + (r.since ? "since " + fmtDate(r.since) : "in the last 30 days") + " and aren't tracked yet.</p>";
+    h += r.candidates.length ? '<div class="compact">' + r.candidates.map((x, i) => {
+      const jobOpts = '<option value="">No job</option>' + state.jobs.map(j => '<option value="' + j.id + '"' + (j.id === x.jobId ? " selected" : "") + ">" + esc(j.role + " · " + j.company) + "</option>").join("");
+      return '<div class="row"><div class="who"><h3>' + esc(x.name) + '</h3><div class="meta">' + esc(x.title) + (x.company ? " · " + esc(x.company) : "") + "</div></div>" +
+        '<div class="chips"><span class="chip">' + TYPES[x.type] + '</span><span class="chip">Connected ' + fmtDate(x.on) + "</span></div>" +
+        '<div class="actions"><select data-cand-job="' + i + '" aria-label="Job for ' + esc(x.name) + '" style="width:auto">' + jobOpts + "</select>" +
+        '<button class="primary" data-act="add-cand" data-i="' + i + '">Add</button></div></div>';
+    }).join("") + "</div>" : '<p class="empty">No new hiring-related connections found.</p>';
+    h += "</section>";
+  }
+  return h;
+}
+
+/* Profile */
+function renderProfile(){
+  const p = state.profile, s = state.settings;
+  const f = (k, label, ph, type) => "<label>" + label + '<input data-prof="' + k + '" id="p-' + k + '" ' + (type ? 'type="' + type + '" ' : "") + 'value="' + esc(p[k]) + '" placeholder="' + esc(ph) + '"></label>';
+  let h = '<section class="panel" style="margin-bottom:16px"><h2>About you</h2><p class="note" style="margin:0 0 12px">Every draft is built from these. Changes save automatically.</p><div class="formgrid">' +
+    f("name", "Your name", "e.g. Alex Kumar") + f("title", "Current title", "e.g. Data Analyst") + f("years", "Years of experience", "e.g. 3") +
+    f("targets", "Roles you're targeting", "e.g. data analyst or BI analyst") + f("skills", "Top skills (short)", "e.g. SQL, Python and Tableau") +
+    f("resume", "Resume or portfolio link (optional)", "https://", "url") + f("email", "Email for scheduling (optional)", "you@example.com", "email") + "</div>" +
+    '<label style="margin-top:10px">Your strongest result, in one sentence<textarea data-prof="highlight" id="p-highlight" placeholder="e.g. At Acme I automated weekly reporting with SQL and Python, cutting it from 6 hours to 30 minutes">' + esc(p.highlight) + "</textarea></label>" +
+    '<p class="note">Specific numbers get replies. "Cut reporting time from 6 hours to 30 minutes" beats "passionate about data". Each job can also have its own fit line.</p></section>';
+  h += '<section class="panel"><h2>Timing</h2><div class="formgrid">' +
+    '<label>Nudge after this many days without a reply<input type="number" min="3" max="30" data-set="nudgeAfter" id="s-nudge" value="' + esc(s.nudgeAfter) + '"></label>' +
+    '<label>Daily connection request goal<input type="number" min="1" max="40" data-set="dailyGoal" id="s-goal" value="' + esc(s.dailyGoal) + '"></label></div>' +
+    '<p class="note">About 10 well-chosen requests a day beats 50 generic ones, and keeps you well clear of LinkedIn\'s invite limits.</p></section>';
+  return h;
+}
+
+/* ---------- actions ---------- */
+function setStage(c, stage){
+  const t = todayISO();
+  c.stage = stage;
+  if(stage === "requested" && !c.requestedOn) c.requestedOn = t;
+  if(stage === "accepted" && !c.acceptedOn) c.acceptedOn = t;
+  if(stage === "messaged" && !c.messagedOn) c.messagedOn = t;
+  if(stage === "followed_up" && !c.nudgedOn) c.nudgedOn = t;
+  if(stage === "replied" && !c.repliedOn) c.repliedOn = t;
+}
+function recordSent(c, kind, text){
+  c.thread = c.thread || [];
+  c.thread.push({ from:"me", kind, on: todayISO(), text });
+  if(kind === "follow" && !c.sentMeta){
+    const j = jobById(c.jobId);
+    c.sentMeta = { hasNumber: /\d/.test(text.replace(/https?:\/\/\S+/g, "")), src: (c.src && c.src.follow) || "template", fit: !!(j && j.fitLine && text.includes(stripDot(j.fitLine).slice(0, 25))), len: text.length };
+  }
+}
+async function copyText(text, ta){
+  try{ await navigator.clipboard.writeText(text); toast("Copied. Paste it into LinkedIn."); return; } catch(_){}
+  try{ if(ta){ ta.focus(); ta.select(); if(document.execCommand("copy")){ toast("Copied. Paste it into LinkedIn."); return; } } } catch(_){}
+  toast("Select the text and copy it with Ctrl+C or Cmd+C.");
+}
+function updateCounter(id, kind, text){
+  const el = document.querySelector('[data-counter="' + id + "-" + kind + '"]');
+  if(el) el.innerHTML = counterHTML(text, KIND[kind].limit);
+}
+let aiBusy = false;
+function jobContext(j){
+  if(!j) return "No specific job.";
+  let s = "Job: " + j.role + " at " + j.company + (j.applied ? " (I have applied)" : " (not applied yet)") + ".";
+  if(j.fitLine) s += "\nMy fit line for this job: " + j.fitLine;
+  if(j.analysis && j.analysis.requirements) s += "\nTheir top requirements: " + j.analysis.requirements.map(r => r.requirement + (r.evidence ? " (my evidence: " + r.evidence + ")" : "")).join("; ");
+  else if(j.posting) s += "\nJob posting excerpt: " + j.posting.slice(0, 1500);
+  return s;
+}
+async function rewriteWithClaude(c, kind, btn){
+  if(!sample || aiBusy) return;
+  const ta = document.getElementById("m-" + c.id + "-" + kind);
+  if(!ta) return;
+  aiBusy = true; btn.disabled = true; btn.textContent = "Writing…";
+  const j = jobById(c.jobId), k = KIND[kind], p = state.profile;
+  const purpose = kind === "connect" ? "a LinkedIn connection request note"
+    : kind === "nudge" ? "a short, polite follow-up nudge on LinkedIn after my earlier message got no reply"
+    : c.type === "referral" ? "a LinkedIn message to someone I'm already connected with, asking whether they'd refer me"
+    : "a LinkedIn message sent right after they accepted my connection request";
+  const ask = kind === "connect" ? "Say why I'm connecting. No ask yet."
+    : kind === "nudge" ? "Two sentences, no new ask."
+    : c.type === "referral" ? "Be warm and low-pressure. Ask if they'd be open to referring me, and offer to make it easy with a resume and a short blurb."
+    : c.type === "recruiter" ? "End with one easy question: are they the right person for this role, or who is?"
+    : c.type === "manager" ? "Show interest in their team's work tied to the job's top requirement, then ask for a 10-minute chat about what they need in this hire."
+    : "Ask who the right person to talk to is.";
+  const prompt = "Write " + purpose + ".\n\nAbout me:\n" + profileText() + "\n\nThem: " + c.name + ", " + (c.title || TYPES[c.type]) + " at " + (c.company || (j && j.company) || "(unknown)") + ".\n" + jobContext(j) +
+    "\n\nCurrent draft for reference:\n" + ta.value +
+    "\n\nRules: " + ask + " Stay under " + k.limit + " characters. Sound like a real person: warm, direct, specific. Connect my experience to their top requirement where possible. Use only facts given above; never invent numbers, employers or mutual contacts. No emojis, hashtags, subject line, or \"I hope this finds you well\". Address them by first name. " +
+    (p.name && kind !== "connect" ? "Sign off with my first name on its own line. " : "") + "Reply with the message text only.";
+  try{
+    const res = await sample(prompt, { onText: ({ text }) => { ta.value = text; updateCounter(c.id, kind, text); } });
+    const text = String(res.text || "").trim();
+    if(text){ ta.value = text; c.msgs[kind] = text; c.src[kind] = "ai"; updateCounter(c.id, kind, text); save(); }
+    btn.textContent = "Rewrite again";
+  } catch(e){ btn.textContent = claudeErr(e); }
+  btn.disabled = false; aiBusy = false;
+}
+async function analyzePosting(j, btn){
+  if(!sample || aiBusy || !j.posting) return;
+  aiBusy = true; btn.disabled = true; btn.textContent = "Reading the posting…";
+  const prompt = "You help a job seeker tailor LinkedIn outreach. Read the job posting and the candidate profile.\n\nJOB POSTING (" + j.role + " at " + j.company + "):\n" + j.posting.slice(0, 8000) +
+    "\n\nCANDIDATE:\n" + profileText() +
+    "\n\nReturn a JSON object with these keys:\n" +
+    "\"requirements\": the 3 requirements that matter most to this employer, each {\"requirement\": short phrase, \"evidence\": the candidate's matching experience in 15 words or fewer, taken only from the profile, or \"\" if the profile doesn't show it},\n" +
+    "\"fit_line\": one sentence under 160 characters, in first person, that links the candidate's real experience to the employer's top need. Use only facts in the profile. If the profile is empty, write it with [brackets] where the candidate should fill in their own detail,\n" +
+    "\"manager_titles\": 3 job titles the hiring manager for this role probably has, for a LinkedIn people search,\n" +
+    "\"gaps\": up to 2 short phrases naming requirements the profile doesn't show.";
+  try{
+    const v = await askJSON(prompt);
+    j.analysis = {
+      requirements: (Array.isArray(v.requirements) ? v.requirements : []).slice(0, 4).map(r => ({ requirement: String(r.requirement || r || ""), evidence: String(r.evidence || "") })),
+      manager_titles: (Array.isArray(v.manager_titles) ? v.manager_titles : []).slice(0, 3).map(String),
+      gaps: (Array.isArray(v.gaps) ? v.gaps : []).slice(0, 2).map(String),
+      at: todayISO()
+    };
+    if(v.fit_line && (!j.fitLine || confirmReplaceFit(j))) j.fitLine = String(v.fit_line).trim();
+    save(); aiBusy = false; render(); toast("Done. Your messages for this job now use the fit line.");
+    return;
+  } catch(e){ btn.textContent = claudeErr(e); }
+  btn.disabled = false; aiBusy = false;
+}
+function confirmReplaceFit(j){ return !!j.analysis && !j._fitTouched; }
+async function coachReply(c, btn){
+  if(!sample || aiBusy) return;
+  const their = (c.theirDraft || "").trim();
+  if(!their){ toast("Paste their reply first."); document.getElementById("r-" + c.id)?.focus(); return; }
+  aiBusy = true; btn.disabled = true; btn.textContent = "Thinking…";
+  const j = jobById(c.jobId);
+  const history = (c.thread || []).slice(-6).map(t => (t.from === "me" ? "ME: " : "THEM: ") + t.text).join("\n\n");
+  const prompt = "You coach a job seeker through LinkedIn conversations with " + (c.type === "referral" ? "a contact they already know" : "a " + TYPES[c.type].toLowerCase()) + ".\n\nCANDIDATE:\n" + profileText() + (state.profile.email ? "\nEmail: " + state.profile.email : "") +
+    "\n\n" + jobContext(j) + "\n\nTHEM: " + c.name + ", " + (c.title || TYPES[c.type]) + " at " + (c.company || (j && j.company) || "") +
+    "\n\nCONVERSATION SO FAR:\n" + (history || "(none recorded)") + "\n\nTHEIR LATEST MESSAGE:\n" + their.slice(0, 4000) +
+    "\n\nReturn a JSON object: {\"situation\": 2-5 word label for what they're saying, \"advice\": one sentence on the best next move and why, \"reply\": the candidate's reply, under 600 characters, warm and direct, moving toward an interview or referral, using only facts given, with [brackets] for details the candidate must fill in such as times or attachments, signed with the candidate's first name if known}.";
+  try{
+    const v = await askJSON(prompt);
+    c.coach = { situation: String(v.situation || "Suggestion"), advice: String(v.advice || "") };
+    c.myDraft = String(v.reply || "").trim();
+    save(); aiBusy = false; render();
+    document.getElementById("a-" + c.id)?.focus();
+    return;
+  } catch(e){ btn.textContent = claudeErr(e); }
+  btn.disabled = false; aiBusy = false;
+}
+
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-act]");
+  if(!el || el.tagName === "SELECT" || (el.tagName === "INPUT" && el.type !== "checkbox")) return;
+  const act = el.dataset.act;
+  const c = el.dataset.id ? contactById(el.dataset.id) : null;
+  switch(act){
+    case "copy": { const ta = document.getElementById("m-" + c.id + "-" + el.dataset.kind); copyText(ta ? ta.value : msgFor(c, el.dataset.kind), ta); break; }
+    case "copy-answer": { const ta = document.getElementById("a-" + c.id); if(ta && ta.value.trim()) copyText(ta.value, ta); else toast("Write or pick an answer first."); break; }
+    case "reset": delete c.msgs[el.dataset.kind]; delete c.src[el.dataset.kind]; save(); render(); break;
+    case "ai": rewriteWithClaude(c, el.dataset.kind, el); break;
+    case "analyze": { const j = jobById(el.dataset.job); if(j) analyzePosting(j, el); break; }
+    case "coach": coachReply(c, el); break;
+    case "sit": {
+      const x = ctx(c); c.myDraft = SITUATIONS[el.dataset.sit].tpl(x); c.coach = null;
+      const ta = document.getElementById("a-" + c.id); if(ta){ ta.value = c.myDraft; ta.focus(); }
+      save(); break;
+    }
+    case "sent-answer": {
+      const ans = (c.myDraft || "").trim();
+      if(!ans){ toast("Write or pick an answer first."); break; }
+      if((c.theirDraft || "").trim()) c.thread.push({ from:"them", on: todayISO(), text: c.theirDraft.trim() });
+      c.thread.push({ from:"me", kind:"reply", on: todayISO(), text: ans });
+      c.theirDraft = ""; c.myDraft = ""; c.coach = null; save(); render(); toast("Saved to your conversation. Mark how it went when you know.");
+      break;
+    }
+    case "outcome": {
+      c.outcome = el.dataset.out; if(c.outcome !== "no" && !c.repliedOn) c.repliedOn = todayISO();
+      c.stage = "closed"; save(); render(); toast(c.outcome === "no" ? "Closed." : "Congrats! Logged in What's working."); break;
+    }
+    case "sent-request": recordSent(c, "connect", (document.getElementById("m-" + c.id + "-connect") || {}).value || msgFor(c, "connect")); setStage(c, "requested"); save(); render(); toast("Marked as sent. It moves to Waiting."); break;
+    case "accepted": setStage(c, "accepted"); save(); render(); toast("Your message is ready at the top."); break;
+    case "sent-follow": recordSent(c, "follow", (document.getElementById("m-" + c.id + "-follow") || {}).value || msgFor(c, "follow")); setStage(c, "messaged"); save(); render(); toast("Nice. A nudge reminder is set for " + (state.settings.nudgeAfter || 7) + " days."); break;
+    case "sent-nudge": recordSent(c, "nudge", (document.getElementById("m-" + c.id + "-nudge") || {}).value || msgFor(c, "nudge")); setStage(c, "followed_up"); save(); render(); break;
+    case "replied": setStage(c, "replied"); save(); render(); toast("Paste their reply at the top of Today to get a suggested answer."); break;
+    case "del-contact": state.contacts = state.contacts.filter(x => x.id !== c.id); save(); render(); toast("Contact deleted."); break;
+    case "del-job": {
+      const id = el.dataset.job;
+      state.jobs = state.jobs.filter(j => j.id !== id);
+      state.contacts.forEach(x => { if(x.jobId === id) x.jobId = ""; });
+      save(); render(); toast("Job deleted. Its contacts moved to Not linked."); break;
+    }
+    case "toggle-applied": { const j = jobById(el.dataset.job); if(j){ j.applied = el.checked; if(j.applied && !j.appliedOn) j.appliedOn = todayISO(); save(); render(); } break; }
+    case "add-warm": {
+      const j = jobById(el.dataset.job);
+      const p = allNetwork().find(x => x.name === el.dataset.name && sameCompany(x.company, j.company));
+      if(!p || !j) break;
+      state.contacts.push(mkContact({ jobId: j.id, name: p.name, title: p.title, company: j.company, type: "referral", url: p.url, stage: "accepted", acceptedOn: p.on || todayISO(), example: !!p.example }));
+      save(); render(); toast("Added. Your referral request is on the Today tab."); break;
+    }
+    case "goto-job": { e.preventDefault(); const id = el.dataset.job; location.hash = "#jobs"; setTimeout(() => document.getElementById("job-" + id)?.scrollIntoView({ block:"start" }), 30); break; }
+    case "clear-examples":
+      state.jobs = state.jobs.filter(j => !j.example);
+      state.contacts = state.contacts.filter(x => !x.example);
+      state.exampleNet = []; save(); render(); toast("Examples removed."); break;
+    case "add-cand": addCandidate(Number(el.dataset.i)); break;
+    case "add-all": if(importResult){ for(let i = importResult.candidates.length - 1; i >= 0; i--) addCandidate(i, true); render(); toast("Added. Their messages are on the Today tab."); } break;
+  }
+});
+document.addEventListener("input", e => {
+  const t = e.target;
+  if(t.matches("textarea.msg[data-kind]")){
+    const c = contactById(t.dataset.id); if(!c) return;
+    c.msgs[t.dataset.kind] = t.value;
+    if(c.src[t.dataset.kind] !== "ai") c.src[t.dataset.kind] = "edited";
+    updateCounter(c.id, t.dataset.kind, t.value); save();
+  } else if(t.dataset.coach){
+    const c = contactById(t.dataset.id); if(!c) return;
+    if(t.dataset.coach === "their") c.theirDraft = t.value; else c.myDraft = t.value;
+    save();
+  } else if(t.dataset.jobfield){
+    const j = jobById(t.dataset.job); if(!j) return;
+    j[t.dataset.jobfield] = t.value;
+    if(t.dataset.jobfield === "fitLine") j._fitTouched = true;
+    if(t.dataset.jobfield === "posting"){ const b = document.querySelector('[data-act="analyze"][data-job="' + j.id + '"]'); if(b) b.disabled = !t.value.trim(); }
+    save();
+  } else if(t.dataset.prof){ state.profile[t.dataset.prof] = t.value; save(); }
+  else if(t.dataset.set){ const n = parseInt(t.value, 10); if(n > 0){ state.settings[t.dataset.set] = n; save(); } }
+  else if(t.dataset.act === "note"){ const c = contactById(t.dataset.id); if(c){ c.notes = t.value; save(); } }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if(t.dataset.act === "stage"){ const c = contactById(t.dataset.id); if(c){ setStage(c, t.value); save(); render(); } }
+  else if(t.id === "csv" && t.files && t.files[0]) readFile(t.files[0]);
+});
+document.addEventListener("submit", e => {
+  const f = e.target; e.preventDefault();
+  const d = Object.fromEntries(new FormData(f).entries());
+  if(f.dataset.form === "job"){
+    const j = { id: uid(), company: d.company.trim(), role: d.role.trim(), link: (d.link || "").trim(), applied: !!d.applied, appliedOn: d.applied ? todayISO() : "", posting: (d.posting || "").trim(), fitLine:"", analysis:null };
+    state.jobs.unshift(j); save(); render();
+    const known = knownAt(j.company).length;
+    toast(known ? "Job added. You know " + known + " " + (known === 1 ? "person" : "people") + " there!" : j.posting && sample ? "Job added. Analyze the posting to tailor your messages." : "Job added. Now add the recruiter and hiring manager.");
+    setTimeout(() => document.getElementById("job-" + j.id)?.scrollIntoView({ block:"start" }), 30);
+  } else if(f.dataset.form === "contact"){
+    const j = jobById(f.dataset.job);
+    const c = mkContact({ jobId: f.dataset.job || "", name: d.name.trim(), title: (d.title || "").trim(), company: j ? j.company : "", type: d.type, url: normUrl(d.url) });
+    setStage(c, d.type === "referral" && d.stage === "to_connect" ? "accepted" : (d.stage || "to_connect"));
+    state.contacts.push(c); save(); render(); toast(c.stage === "to_connect" ? "Added. Their connection note is on the Today tab." : c.stage === "accepted" ? "Added. Their message is on the Today tab." : "Added.");
+  }
+});
+window.addEventListener("hashchange", () => { setViewFromHash(); render(); });
+
+/* ---------- LinkedIn CSV import ---------- */
+function normUrl(u){
+  u = String(u || "").trim();
+  if(!u) return "";
+  const m = u.match(/linkedin\.com\/in\/([^/?#\s]+)/i);
+  if(m) return "https://www.linkedin.com/in/" + m[1] + "/";
+  if(/^in\//i.test(u)) return "https://www.linkedin.com/" + u.replace(/\/?$/, "/");
+  return /^https?:\/\//i.test(u) ? u : "";
+}
+function slugOf(u){
+  const m = String(u || "").match(/linkedin\.com\/in\/([^/?#\s]+)/i);
+  if(!m) return "";
+  try{ return decodeURIComponent(m[1]).toLowerCase(); } catch(_){ return m[1].toLowerCase(); }
+}
+function parseCSV(text){
+  const rows = []; let row = [], field = "", q = false;
+  for(let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if(q){ if(ch === '"'){ if(text[i+1] === '"'){ field += '"'; i++; } else q = false; } else field += ch; }
+    else if(ch === '"') q = true;
+    else if(ch === ","){ row.push(field); field = ""; }
+    else if(ch === "\n" || ch === "\r"){ if(ch === "\r" && text[i+1] === "\n") i++; row.push(field); rows.push(row); row = []; field = ""; }
+    else field += ch;
+  }
+  if(field || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+const MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function parseDate(s){
+  s = String(s || "").trim();
+  let m = s.match(/^(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})$/);
+  if(m && MONTHS[m[2].toLowerCase()]) return m[3] + "-" + pad(MONTHS[m[2].toLowerCase()]) + "-" + pad(+m[1]);
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(m){ const y = m[3].length === 2 ? "20" + m[3] : m[3]; return y + "-" + pad(+m[1]) + "-" + pad(+m[2]); }
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return m[1] + "-" + m[2] + "-" + m[3];
+  const d = new Date(s);
+  return isNaN(d) ? "" : isoOf(d);
+}
+const RE_RECRUITER = /recruit|talent|sourc|staffing|people partner|\bhr\b|human resources|people operations|acquisition/i;
+const RE_MANAGER = /manager|director|head of|\bvp\b|vice president|\blead\b|founder|\bcto\b|\bceo\b|chief|principal/i;
+function readFile(file){
+  if(/\.zip$/i.test(file.name)){ importResult = { total:0, matched:[], candidates:[], error:"That's the zipped archive. Unzip it first, then choose Connections.csv from inside." }; render(); return; }
+  const r = new FileReader();
+  r.onload = () => runImport(String(r.result || ""));
+  r.onerror = () => { importResult = { total:0, matched:[], candidates:[], error:"Couldn't read that file. Try choosing it again." }; render(); };
+  r.readAsText(file);
+}
+async function runImport(text){
+  const rows = parseCSV(text.replace(/^﻿/, ""));
+  const hi = rows.findIndex(r => r.some(x => /first name/i.test(x)) && r.some(x => /connected on/i.test(x)));
+  if(hi < 0){ importResult = { total:0, matched:[], candidates:[], error:"This doesn't look like LinkedIn's Connections.csv. Look for that exact file name inside the unzipped archive." }; render(); return; }
+  const head = rows[hi].map(h => h.trim().toLowerCase());
+  const col = name => head.indexOf(name);
+  const iF = col("first name"), iL = col("last name"), iU = col("url"), iC = col("company"), iP = col("position"), iD = col("connected on");
+  const people = rows.slice(hi + 1).filter(r => r.length > 2 && (r[iF] || r[iL])).map(r => ({
+    name: ((r[iF] || "") + " " + (r[iL] || "")).trim(), url: normUrl(r[iU]), slug: slugOf(r[iU]),
+    company: (r[iC] || "").trim(), title: (r[iP] || "").trim(), on: parseDate(r[iD])
+  }));
+  const bySlug = new Map(), byName = new Map();
+  state.contacts.forEach(c => { const s = slugOf(c.url); if(s) bySlug.set(s, c); byName.set(nameKey(c.name), c); });
+  const matched = [];
+  people.forEach(p => {
+    const c = (p.slug && bySlug.get(p.slug)) || byName.get(nameKey(p.name));
+    if(!c) return;
+    if(!c.url && p.url) c.url = p.url;
+    if(!c.title && p.title) c.title = p.title;
+    if(c.stage === "to_connect" || c.stage === "requested"){
+      c.stage = "accepted"; c.acceptedOn = p.on || todayISO(); if(!c.requestedOn) c.requestedOn = c.acceptedOn;
+      matched.push({ id: c.id, on: c.acceptedOn });
+    }
+  });
+  const since = state.meta.lastConnectedMax || "";
+  const floor = since || isoOffset(-30);
+  const candidates = people.filter(p => {
+    if(!p.on || (since ? p.on <= floor : p.on < floor)) return false;
+    if((p.slug && bySlug.has(p.slug)) || byName.has(nameKey(p.name))) return false;
+    return RE_RECRUITER.test(p.title) || RE_MANAGER.test(p.title);
+  }).map(p => {
+    const job = state.jobs.find(j => sameCompany(j.company, p.company));
+    return Object.assign({}, p, { type: RE_RECRUITER.test(p.title) ? "recruiter" : "manager", jobId: job ? job.id : "" });
+  }).sort((a, b) => (a.on < b.on ? 1 : -1));
+  state.meta.lastConnectedMax = people.reduce((m, p) => (p.on && p.on > m ? p.on : m), state.meta.lastConnectedMax || "");
+  state.meta.lastImportAt = todayISO();
+  state.meta.netCount = people.length;
+  network = people;
+  const warm = warmOpenings().reduce((n, w) => n + w.people.filter(x => !x.example).length, 0);
+  importResult = { total: people.length, matched, candidates, since, warm };
+  save(); render();
+  toast(matched.length ? matched.length + " accepted. Their messages are on the Today tab." : warm ? "Import done. You know " + warm + " people at your target companies." : "Import done.");
+  await saveNetwork(people);
+}
+function addCandidate(i, quiet){
+  if(!importResult) return;
+  const x = importResult.candidates[i]; if(!x) return;
+  const sel = document.querySelector('[data-cand-job="' + i + '"]');
+  const jobId = sel ? sel.value : x.jobId;
+  const j = jobById(jobId);
+  state.contacts.push(mkContact({ jobId: jobId || "", name: x.name, title: x.title, company: x.company || (j ? j.company : ""), type: x.type, url: x.url, stage: "accepted", requestedOn: x.on, acceptedOn: x.on }));
+  importResult.candidates.splice(i, 1);
+  save();
+  if(!quiet){ render(); toast("Added. Their message is on the Today tab."); }
+}
+function wireDrop(){
+  const d = $("#drop"); if(!d) return;
+  ["dragenter","dragover"].forEach(ev => d.addEventListener(ev, e => { e.preventDefault(); d.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev => d.addEventListener(ev, e => { e.preventDefault(); d.classList.remove("over"); }));
+  d.addEventListener("drop", e => { const f = e.dataTransfer && e.dataTransfer.files[0]; if(f) readFile(f); });
+}
+
+setViewFromHash();
+init();
+})();
+</script>
+</body>
+</html>
